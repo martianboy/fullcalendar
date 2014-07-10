@@ -445,19 +445,25 @@ function BasicView(element, calendar, viewName) {
 	/* Utilities
 	--------------------------------------------------------*/
 	
+	rtl = opt('isRTL');
 	
 	coordinateGrid = new CoordinateGrid(function(rows, cols) {
 		var e, n, p;
 		headCells.each(function(i, _e) {
 			e = $(_e);
-			n = e.offset().left;
+			n = e.offset().left + (rtl ? e.outerWidth() : 0);
 			if (i) {
 				p[1] = n;
 			}
 			p = [n];
 			cols[i] = p;
 		});
-		p[1] = n + e.outerWidth();
+		if (rtl) {
+			p[1] = e.offset().left;
+		}
+		else {
+			p[1] = n + e.outerWidth();
+		}
 		bodyRows.each(function(i, _e) {
 			if (i < rowCnt) {
 				e = $(_e);
@@ -470,7 +476,7 @@ function BasicView(element, calendar, viewName) {
 			}
 		});
 		p[1] = n + e.outerHeight();
-	});
+	}, rtl);
 	
 	
 	hoverListener = new HoverListener(coordinateGrid);

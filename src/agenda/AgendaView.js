@@ -660,19 +660,27 @@ function AgendaView(element, calendar, viewName) {
 	/* Coordinate Utilities
 	-----------------------------------------------------------------------------*/
 	
+	rtl = opt('isRTL');
 	
 	coordinateGrid = new CoordinateGrid(function(rows, cols) {
 		var e, n, p;
 		dayHeadCells.each(function(i, _e) {
 			e = $(_e);
-			n = e.offset().left;
+			n = e.offset().left + (rtl ? e.outerWidth() : 0);
+
 			if (i) {
 				p[1] = n;
 			}
 			p = [n];
 			cols[i] = p;
 		});
-		p[1] = n + e.outerWidth();
+		if (rtl) {
+			p[1] = e.offset().left;
+		}
+		else {
+			p[1] = n + e.outerWidth();
+		}
+
 		if (opt('allDaySlot')) {
 			e = allDayRow;
 			n = e.offset().top;
@@ -690,7 +698,7 @@ function AgendaView(element, calendar, viewName) {
 				constrain(slotTableTop + snapHeight*(i+1))
 			]);
 		}
-	});
+	}, rtl);
 	
 	
 	hoverListener = new HoverListener(coordinateGrid);
@@ -815,8 +823,7 @@ function AgendaView(element, calendar, viewName) {
 			renderDayOverlay(start, end, true); // true for refreshing coordinate grid
 		}
 	}
-	
-	
+
 	function renderSlotSelection(startDate, endDate) {
 		var helperOption = opt('selectHelper');
 		coordinateGrid.build();

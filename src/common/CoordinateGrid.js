@@ -1,5 +1,5 @@
 
-function CoordinateGrid(buildFunc) {
+function CoordinateGrid(buildFunc, rtl) {
 
 	var t = this;
 	var rows;
@@ -24,9 +24,17 @@ function CoordinateGrid(buildFunc) {
 			}
 		}
 		for (i=0; i<colCnt; i++) {
-			if (x >= cols[i][0] && x < cols[i][1]) {
-				c = i;
-				break;
+			if (rtl) {
+				if (x < cols[i][0] && x >= cols[i][1]) {
+					c = i;
+					break;
+				}
+			}
+			else {
+				if (x >= cols[i][0] && x < cols[i][1]) {
+					c = i;
+					break;
+				}
 			}
 		}
 		return (r>=0 && c>=0) ? { row: r, col: c } : null;
@@ -35,12 +43,23 @@ function CoordinateGrid(buildFunc) {
 	
 	t.rect = function(row0, col0, row1, col1, originElement) { // row1,col1 is inclusive
 		var origin = originElement.offset();
-		return {
-			top: rows[row0][0] - origin.top,
-			left: cols[col0][0] - origin.left,
-			width: cols[col1][1] - cols[col0][0],
-			height: rows[row1][1] - rows[row0][0]
-		};
+
+		if (rtl) {
+			return {
+				top: rows[row0][0] - origin.top,
+				left: cols[col0][1] - origin.left,
+				width: cols[col1][0] - cols[col0][1],
+				height: rows[row1][1] - rows[row0][0]
+			};
+		}
+		else {
+			return {
+				top: rows[row0][0] - origin.top,
+				left: cols[col0][0] - origin.left,
+				width: cols[col1][1] - cols[col0][0],
+				height: rows[row1][1] - rows[row0][0]
+			};
+		}
 	};
 
 }

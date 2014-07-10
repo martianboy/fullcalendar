@@ -277,7 +277,7 @@ function View(element, calendar, viewName) {
 	var cellsPerWeek;
 	var dayToCellMap = []; // hash from dayIndex -> cellIndex, for one week
 	var cellToDayMap = []; // hash from cellIndex -> dayIndex, for one week
-	var isRTL = opt('isRTL');
+	// var isRTL = opt('isRTL');
 
 
 	// initialize important internal variables
@@ -360,8 +360,8 @@ function View(element, calendar, viewName) {
 		var colCnt = t.getColCnt();
 
 		// rtl variables. wish we could pre-populate these. but where?
-		var dis = isRTL ? -1 : 1;
-		var dit = isRTL ? colCnt - 1 : 0;
+		var dis = 1; //isRTL ? -1 : 1;
+		var dit = 0; //isRTL ? colCnt - 1 : 0;
 
 		if (typeof row == 'object') {
 			col = row.col;
@@ -422,8 +422,8 @@ function View(element, calendar, viewName) {
 		var colCnt = t.getColCnt();
 
 		// rtl variables. wish we could pre-populate these. but where?
-		var dis = isRTL ? -1 : 1;
-		var dit = isRTL ? colCnt - 1 : 0;
+		var dis = 1; //isRTL ? -1 : 1;
+		var dit = 0; //isRTL ? colCnt - 1 : 0;
 
 		var row = Math.floor(cellOffset / colCnt);
 		var col = ((cellOffset % colCnt + colCnt) % colCnt) * dis + dit; // column, adjusted for RTL (dis & dit)
