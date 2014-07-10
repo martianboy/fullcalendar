@@ -186,10 +186,10 @@ function EventManager(options) { // assumed to be a calendar
 				var timezoneParam = firstDefined(source.timezoneParam, options.timezoneParam);
 
 				if (startParam) {
-					data[startParam] = rangeStart.format();
+					data[startParam] = rangeStart.lang().preparse(rangeStart.format('YYYY-MM-DD LT'));
 				}
 				if (endParam) {
-					data[endParam] = rangeEnd.format();
+					data[endParam] = rangeEnd.lang().preparse(rangeEnd.format('YYYY-MM-DD LT'));
 				}
 				if (options.timezone && options.timezone != 'local') {
 					data[timezoneParam] = options.timezone;
