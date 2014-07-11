@@ -73,8 +73,8 @@ function formatDateWithChunk(date, chunk) {
 // rendering of one date, without any separator.
 function formatRange(date1, date2, formatStr, separator, isRTL) {
 
-	date1 = fc.moment.parseZone(date1);
-	date2 = fc.moment.parseZone(date2);
+	date1 = fc.moment.parseZone(date1.lang().preparse(date1.format('YYYY-MM-DD[T]HH:mmZ'))).lang(date1.lang()._abbr);
+	date2 = fc.moment.parseZone(date2.lang().preparse(date2.format('YYYY-MM-DD[T]HH:mmZ'))).lang(date2.lang()._abbr);
 
 	// Expand localized format strings, like "LL" -> "MMMM D YYYY"
 	formatStr = date1.lang().longDateFormat(formatStr) || formatStr;

@@ -6,7 +6,7 @@
 
 (function(factory) {
 	if (typeof define === 'function' && define.amd) {
-		define([ 'jquery', 'moment-jalaali' ], factory);
+		define([ 'jquery', 'moment-jalaali', 'moment-timezone' ], factory);
 	}
 	else {
 		factory(jQuery, moment);

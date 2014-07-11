@@ -6,7 +6,7 @@
 
 (function(factory) {
 	if (typeof define === 'function' && define.amd) {
-		define([ 'jquery', 'moment-jalaali' ], factory);
+		define([ 'jquery', 'moment-jalaali', 'moment-timezone' ], factory);
 	}
 	else {
 		factory(jQuery, moment);
@@ -1555,12 +1555,6 @@ function EventManager(options) { // assumed to be a calendar
 
 
 	function updateEvent(event) {
-
-		event.start = t.moment(event.start);
-		if (event.end) {
-			event.end = t.moment(event.end);
-		}
-
 		mutateEvent(event);
 		propagateMiscProperties(event);
 		reportEvents(cache); // reports event modifications (so we can redraw)
@@ -1841,20 +1835,19 @@ function EventManager(options) { // assumed to be a calendar
 			}
 		}
 
-		if (newAllDay != oldAllDay) {
-			// if allDay has changed, always throw away the end
-			clearEnd = true;
-		}
 		else if (newEnd) {
 			durationDelta = dayishDiff(
 				// new duration
 				newEnd || t.getDefaultEventEnd(newAllDay, newStart || oldStart),
 				newStart || oldStart
-			).subtract(dayishDiff(
-				// subtract old duration
-				oldEnd || t.getDefaultEventEnd(oldAllDay, oldStart),
-				oldStart
-			));
+			);
+			if (!(newAllDay && !oldAllDay)) {
+				durationDelta.subtract(dayishDiff(
+					// subtract old duration
+					oldEnd || t.getDefaultEventEnd(oldAllDay, oldStart),
+					oldStart
+				));
+			}
 		}
 
 		undoFunc = mutateEvents(
@@ -1882,7 +1875,7 @@ function EventManager(options) { // assumed to be a calendar
 	// Returns a function that can be called to undo all the operations.
 	//
 	function mutateEvents(events, clearEnd, forceAllDay, dateDelta, durationDelta) {
-		var isAmbigTimezone = t.getIsAmbigTimezone();
+		// var isAmbigTimezone = t.getIsAmbigTimezone();
 		var undoFunctions = [];
 
 		$.each(events, function(i, event) {
@@ -1921,17 +1914,6 @@ function EventManager(options) { // assumed to be a calendar
 			newStart.add(dateDelta);
 			if (newEnd) {
 				newEnd.add(dateDelta).add(durationDelta);
-			}
-
-			// if the dates have changed, and we know it is impossible to recompute the
-			// timezone offsets, strip the zone.
-			if (isAmbigTimezone) {
-				if (+dateDelta || +durationDelta) {
-					newStart.stripZone();
-					if (newEnd) {
-						newEnd.stripZone();
-					}
-				}
 			}
 
 			event.allDay = newAllDay;
@@ -2690,8 +2672,8 @@ function formatDateWithChunk(date, chunk) {
 // rendering of one date, without any separator.
 function formatRange(date1, date2, formatStr, separator, isRTL) {
 
-	date1 = fc.moment.parseZone(date1);
-	date2 = fc.moment.parseZone(date2);
+	date1 = fc.moment.parseZone(date1.lang().preparse(date1.format('YYYY-MM-DD[T]HH:mmZ'))).lang(date1.lang()._abbr);
+	date2 = fc.moment.parseZone(date2.lang().preparse(date2.format('YYYY-MM-DD[T]HH:mmZ'))).lang(date2.lang()._abbr);
 
 	// Expand localized format strings, like "LL" -> "MMMM D YYYY"
 	formatStr = date1.lang().longDateFormat(formatStr) || formatStr;
