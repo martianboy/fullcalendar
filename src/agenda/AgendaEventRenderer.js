@@ -517,6 +517,7 @@ function AgendaEventRenderer() {
 		var colDelta, prevColDelta;
 		var dayDelta; // derived from colDelta
 		var snapDelta, prevSnapDelta; // the number of snaps away from the original position
+		var isRTL = opt('isRTL');
 
 		// newly computed
 		var eventStart, eventEnd;
@@ -562,7 +563,7 @@ function AgendaEventRenderer() {
 					isAllDay = getIsCellAllDay(cell);
 
 					// calculate column delta
-					colDelta = Math.round((ui.position.left - origPosition.left) / colWidth);
+					colDelta = (isRTL ? -1 : 1) * Math.round((ui.position.left - origPosition.left) / colWidth);
 					if (colDelta != prevColDelta) {
 						// calculate the day delta based off of the original clicked column and the column delta
 						var origDate = cellToDate(0, origCell.col);

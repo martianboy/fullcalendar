@@ -374,7 +374,7 @@ function View(element, calendar, viewName) {
 
 	// cell offset -> day offset
 	function cellOffsetToDayOffset(cellOffset) {
-		var day0 = t.start.day(); // first date's day of week
+		var day0 = t.start.weekday(); // first date's day of week
 		cellOffset += dayToCellMap[day0]; // normlize cellOffset to beginning-of-week
 		return Math.floor(cellOffset / cellsPerWeek) * 7 + // # of days from full weeks
 			cellToDayMap[ // # of days from partial last week

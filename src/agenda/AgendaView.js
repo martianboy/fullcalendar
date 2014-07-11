@@ -660,29 +660,27 @@ function AgendaView(element, calendar, viewName) {
 	/* Coordinate Utilities
 	-----------------------------------------------------------------------------*/
 	
-	coordinateGrid = new CoordinateGrid(function(rows, cols) {
-		var e, n, p;
-		dayHeadCells.each(function(i, _e) {
-			e = $(_e);
-			n = e.offset().left + (rtl ? e.outerWidth() : 0);
+	rtl = opt('isRTL');
 
-			if (i) {
-				p[1] = n;
-			}
-			p = [n];
-			cols[i] = p;
-		});
-		if (rtl) {
-			p[1] = e.offset().left;
-		}
-		else {
-			p[1] = n + e.outerWidth();
-		}
+	coordinateGrid = new CoordinateGrid(function() {
+		var cols, rows;
 
+		cols = dayHeadCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		// if (rtl) {
+		// 	cols.reverse();
+		// }
+
+		var e, n;
+		rows = [];
 		if (opt('allDaySlot')) {
 			e = allDayRow;
 			n = e.offset().top;
-			rows[0] = [n, n+e.outerHeight()];
+			rows[0] = [n, n + e.outerHeight()];
 		}
 		var slotTableTop = slotContainer.offset().top;
 		var slotScrollerTop = slotScroller.offset().top;
@@ -696,7 +694,12 @@ function AgendaView(element, calendar, viewName) {
 				constrain(slotTableTop + snapHeight*(i+1))
 			]);
 		}
-	});
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	}, rtl);
 	
 	
 	hoverListener = new HoverListener(coordinateGrid);

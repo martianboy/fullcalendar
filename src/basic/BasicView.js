@@ -461,15 +461,11 @@ function BasicView(element, calendar, viewName) {
 			return [[offset.top, offset.top + $el.outerHeight()]];
 		}).toArray();
 
-		if (opt('isRTL')) {
-			cols.reverse();
-		}
-
 		return {
 			rows: rows,
 			cols: cols
 		};
-	});
+	}, opt('isRTL'));
 	
 
 	hoverListener = new HoverListener(coordinateGrid);

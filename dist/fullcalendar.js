@@ -6,7 +6,7 @@
 
 (function(factory) {
 	if (typeof define === 'function' && define.amd) {
-		define([ 'jquery', 'moment' ], factory);
+		define([ 'jquery', 'moment-jalaali' ], factory);
 	}
 	else {
 		factory(jQuery, moment);
@@ -1438,10 +1438,10 @@ function EventManager(options) { // assumed to be a calendar
 				var timezoneParam = firstDefined(source.timezoneParam, options.timezoneParam);
 
 				if (startParam) {
-					data[startParam] = rangeStart.format();
+					data[startParam] = rangeStart.lang().preparse(rangeStart.format('YYYY-MM-DD LT'));
 				}
 				if (endParam) {
-					data[endParam] = rangeEnd.format();
+					data[endParam] = rangeEnd.lang().preparse(rangeEnd.format('YYYY-MM-DD LT'));
 				}
 				if (options.timezone && options.timezone != 'local') {
 					data[timezoneParam] = options.timezone;
@@ -2820,7 +2820,7 @@ function getFormatStringChunks(formatStr) {
 // Break the formatting string into an array of chunks
 function chunkFormatString(formatStr) {
 	var chunks = [];
-	var chunker = /\[([^\]]*)\]|\(([^\)]*)\)|(LT|(\w)\4*o?)|([^\w\[\(]+)/g; // TODO: more descrimination
+	var chunker = /\[([^\]]*)\]|\(([^\)]*)\)|(LT|j?(\w)\4*o?)|([^\w\[\(]+)/g; // TODO: more descrimination
 	var match;
 
 	while ((match = chunker.exec(formatStr))) {
@@ -2877,6 +2877,55 @@ function MonthView(element, calendar) {
 		t.end = t.skipHiddenDays(t.end, -1, true); // move in from the last week if no visible days
 		t.end.add('days', (7 - t.end.weekday()) % 7); // move to end of week if not already
 		t.end = t.skipHiddenDays(t.end, -1, true); // move in from the last invisible days of the week
+
+		var rowCnt = Math.ceil( // need to ceil in case there are hidden days
+			t.end.diff(t.start, 'weeks', true) // returnfloat=true
+		);
+		if (t.opt('weekMode') == 'fixed') {
+			t.end.add('weeks', 6 - rowCnt);
+			rowCnt = 6;
+		}
+
+		t.title = calendar.formatDate(t.intervalStart, t.opt('titleFormat'));
+
+		t.renderBasic(rowCnt, t.getCellsPerWeek(), true);
+	}
+	
+	
+}
+
+;;
+
+fcViews.jmonth = JalaaliMonthView;
+
+function JalaaliMonthView(element, calendar) {
+	var t = this;
+	
+	
+	// exports
+	t.incrementDate = incrementDate;
+	t.render = render;
+	
+	
+	// imports
+	JalaaliBasicView.call(t, element, calendar, 'jmonth');
+
+
+	function incrementDate(date, delta) {
+		return date.clone().stripTime().add('jmonths', delta).startOf('jmonth');
+	}
+
+
+	function render(date) {
+
+		t.intervalStart = date.clone().stripTime().startOf('jmonth');
+		t.intervalEnd = t.intervalStart.clone().add('jmonths', 1);
+
+		t.start = t.intervalStart.clone().startOf('week');
+		t.start = t.skipHiddenDays(t.start);
+
+		t.end = t.intervalEnd.clone().add('days', (7 - t.intervalEnd.weekday()) % 7);
+		t.end = t.skipHiddenDays(t.end, -1, true);
 
 		var rowCnt = Math.ceil( // need to ceil in case there are hidden days
 			t.end.diff(t.start, 'weeks', true) // returnfloat=true
@@ -3422,33 +3471,536 @@ function BasicView(element, calendar, viewName) {
 	/* Utilities
 	--------------------------------------------------------*/
 	
+	coordinateGrid = new CoordinateGrid(function() {
+		var cols, rows;
+
+		cols = headCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		rows = bodyRows.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.top, offset.top + $el.outerHeight()]];
+		}).toArray();
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	}, opt('isRTL'));
 	
-	coordinateGrid = new CoordinateGrid(function(rows, cols) {
-		var e, n, p;
-		headCells.each(function(i, _e) {
-			e = $(_e);
-			n = e.offset().left;
-			if (i) {
-				p[1] = n;
-			}
-			p = [n];
-			cols[i] = p;
-		});
-		p[1] = n + e.outerWidth();
-		bodyRows.each(function(i, _e) {
-			if (i < rowCnt) {
-				e = $(_e);
-				n = e.offset().top;
-				if (i) {
-					p[1] = n;
-				}
-				p = [n];
-				rows[i] = p;
-			}
-		});
-		p[1] = n + e.outerHeight();
+
+	hoverListener = new HoverListener(coordinateGrid);
+	
+	colPositions = new HorizontalPositionCache(function(col) {
+		return firstRowCellInners.eq(col);
 	});
+
+	colContentPositions = new HorizontalPositionCache(function(col) {
+		return firstRowCellContentInners.eq(col);
+	});
+
+
+	function colLeft(col) {
+		return colPositions.left(col);
+	}
+
+
+	function colRight(col) {
+		return colPositions.right(col);
+	}
 	
+	
+	function colContentLeft(col) {
+		return colContentPositions.left(col);
+	}
+	
+	
+	function colContentRight(col) {
+		return colContentPositions.right(col);
+	}
+	
+	
+	function allDayRow(i) {
+		return bodyRows.eq(i);
+	}
+	
+}
+
+;;
+
+setDefaults({
+	weekMode: 'fixed'
+});
+
+
+function JalaaliBasicView(element, calendar, viewName) {
+	var t = this;
+	
+	
+	// exports
+	t.renderBasic = renderBasic;
+	t.setHeight = setHeight;
+	t.setWidth = setWidth;
+	t.renderDayOverlay = renderDayOverlay;
+	t.defaultSelectionEnd = defaultSelectionEnd;
+	t.renderSelection = renderSelection;
+	t.clearSelection = clearSelection;
+	t.reportDayClick = reportDayClick; // for selection (kinda hacky)
+	t.dragStart = dragStart;
+	t.dragStop = dragStop;
+	t.getHoverListener = function() { return hoverListener; };
+	t.colLeft = colLeft;
+	t.colRight = colRight;
+	t.colContentLeft = colContentLeft;
+	t.colContentRight = colContentRight;
+	t.getIsCellAllDay = function() { return true; };
+	t.allDayRow = allDayRow;
+	t.getRowCnt = function() { return rowCnt; };
+	t.getColCnt = function() { return colCnt; };
+	t.getColWidth = function() { return colWidth; };
+	t.getDaySegmentContainer = function() { return daySegmentContainer; };
+	
+	
+	// imports
+	View.call(t, element, calendar, viewName);
+	OverlayManager.call(t);
+	SelectionManager.call(t);
+	BasicEventRenderer.call(t);
+	var opt = t.opt;
+	var trigger = t.trigger;
+	var renderOverlay = t.renderOverlay;
+	var clearOverlays = t.clearOverlays;
+	var daySelectionMousedown = t.daySelectionMousedown;
+	var cellToDate = t.cellToDate;
+	var dateToCell = t.dateToCell;
+	var rangeToSegments = t.rangeToSegments;
+	var formatDate = calendar.formatDate;
+	var calculateWeekNumber = calendar.calculateWeekNumber;
+	
+	
+	// locals
+	
+	var table;
+	var head;
+	var headCells;
+	var body;
+	var bodyRows;
+	var bodyCells;
+	var bodyFirstCells;
+	var firstRowCellInners;
+	var firstRowCellContentInners;
+	var daySegmentContainer;
+	
+	var viewWidth;
+	var viewHeight;
+	var colWidth;
+	var weekNumberWidth;
+	
+	var rowCnt, colCnt;
+	var showNumbers;
+	var coordinateGrid;
+	var hoverListener;
+	var colPositions;
+	var colContentPositions;
+	
+	var tm;
+	var colFormat;
+	var showWeekNumbers;
+	
+	
+	
+	/* Rendering
+	------------------------------------------------------------*/
+	
+	
+	disableTextSelection(element.addClass('fc-grid'));
+	
+	
+	function renderBasic(_rowCnt, _colCnt, _showNumbers) {
+		rowCnt = _rowCnt;
+		colCnt = _colCnt;
+		showNumbers = _showNumbers;
+		updateOptions();
+
+		if (!body) {
+			buildEventContainer();
+		}
+
+		buildTable();
+	}
+	
+	
+	function updateOptions() {
+		tm = opt('theme') ? 'ui' : 'fc';
+		colFormat = opt('columnFormat');
+		showWeekNumbers = opt('weekNumbers');
+	}
+	
+	
+	function buildEventContainer() {
+		daySegmentContainer =
+			$("<div class='fc-event-container' style='position:absolute;z-index:8;top:0;left:0'/>")
+				.appendTo(element);
+	}
+	
+	
+	function buildTable() {
+		var html = buildTableHTML();
+
+		if (table) {
+			table.remove();
+		}
+		table = $(html).appendTo(element);
+
+		head = table.find('thead');
+		headCells = head.find('.fc-day-header');
+		body = table.find('tbody');
+		bodyRows = body.find('tr');
+		bodyCells = body.find('.fc-day');
+		bodyFirstCells = bodyRows.find('td:first-child');
+
+		firstRowCellInners = bodyRows.eq(0).find('.fc-day > div');
+		firstRowCellContentInners = bodyRows.eq(0).find('.fc-day-content > div');
+		
+		markFirstLast(head.add(head.find('tr'))); // marks first+last tr/th's
+		markFirstLast(bodyRows); // marks first+last td's
+		bodyRows.eq(0).addClass('fc-first');
+		bodyRows.filter(':last').addClass('fc-last');
+
+		bodyCells.each(function(i, _cell) {
+			var date = cellToDate(
+				Math.floor(i / colCnt),
+				i % colCnt
+			);
+			trigger('dayRender', t, date, $(_cell));
+		});
+
+		dayBind(bodyCells);
+	}
+
+
+
+	/* HTML Building
+	-----------------------------------------------------------*/
+
+
+	function buildTableHTML() {
+		var html =
+			"<table class='fc-border-separate' style='width:100%' cellspacing='0'>" +
+			buildHeadHTML() +
+			buildBodyHTML() +
+			"</table>";
+
+		return html;
+	}
+
+
+	function buildHeadHTML() {
+		var headerClass = tm + "-widget-header";
+		var html = '';
+		var col;
+		var date;
+
+		html += "<thead><tr>";
+
+		if (showWeekNumbers) {
+			html +=
+				"<th class='fc-week-number " + headerClass + "'>" +
+				htmlEscape(opt('weekNumberTitle')) +
+				"</th>";
+		}
+
+		for (col=0; col<colCnt; col++) {
+			date = cellToDate(0, col);
+			html +=
+				"<th class='fc-day-header fc-" + dayIDs[date.day()] + " " + headerClass + "'>" +
+				htmlEscape(formatDate(date, colFormat)) +
+				"</th>";
+		}
+
+		html += "</tr></thead>";
+
+		return html;
+	}
+
+
+	function buildBodyHTML() {
+		var contentClass = tm + "-widget-content";
+		var html = '';
+		var row;
+		var col;
+		var date;
+
+		html += "<tbody>";
+
+		for (row=0; row<rowCnt; row++) {
+
+			html += "<tr class='fc-week'>";
+
+			if (showWeekNumbers) {
+				date = cellToDate(row, 0);
+				html +=
+					"<td class='fc-week-number " + contentClass + "'>" +
+					"<div>" +
+					htmlEscape(calculateWeekNumber(date)) +
+					"</div>" +
+					"</td>";
+			}
+
+			for (col=0; col<colCnt; col++) {
+				date = cellToDate(row, col);
+				html += buildCellHTML(date);
+			}
+
+			html += "</tr>";
+		}
+
+		html += "</tbody>";
+
+		return html;
+	}
+
+
+	function buildCellHTML(date) { // date assumed to have stripped time
+		var month = t.intervalStart.jMonth();
+		var today = calendar.getNow().stripTime();
+		var html = '';
+		var contentClass = tm + "-widget-content";
+		var classNames = [
+			'fc-day',
+			'fc-' + dayIDs[date.day()],
+			contentClass
+		];
+
+		if (date.jMonth() != month) {
+			classNames.push('fc-other-month');
+		}
+		if (date.isSame(today, 'day')) {
+			classNames.push(
+				'fc-today',
+				tm + '-state-highlight'
+			);
+		}
+		else if (date < today) {
+			classNames.push('fc-past');
+		}
+		else {
+			classNames.push('fc-future');
+		}
+
+		html +=
+			"<td" +
+			" class='" + classNames.join(' ') + "'" +
+			" data-date='" + date.format() + "'" +
+			">" +
+			"<div>";
+
+		if (showNumbers) {
+			html += "<div class='fc-day-number'>" + date.format('jD') + "</div>";
+		}
+
+		html +=
+			"<div class='fc-day-content'>" +
+			"<div style='position:relative'>&nbsp;</div>" +
+			"</div>" +
+			"</div>" +
+			"</td>";
+
+		return html;
+	}
+
+
+
+	/* Dimensions
+	-----------------------------------------------------------*/
+	
+	
+	function setHeight(height) {
+		viewHeight = height;
+		
+		var bodyHeight = Math.max(viewHeight - head.height(), 0);
+		var rowHeight;
+		var rowHeightLast;
+		var cell;
+			
+		if (opt('weekMode') == 'variable') {
+			rowHeight = rowHeightLast = Math.floor(bodyHeight / (rowCnt==1 ? 2 : 6));
+		}else{
+			rowHeight = Math.floor(bodyHeight / rowCnt);
+			rowHeightLast = bodyHeight - rowHeight * (rowCnt-1);
+		}
+		
+		bodyFirstCells.each(function(i, _cell) {
+			if (i < rowCnt) {
+				cell = $(_cell);
+				cell.find('> div').css(
+					'min-height',
+					(i==rowCnt-1 ? rowHeightLast : rowHeight) - vsides(cell)
+				);
+			}
+		});
+		
+	}
+	
+	
+	function setWidth(width) {
+		viewWidth = width;
+		colPositions.clear();
+		colContentPositions.clear();
+
+		weekNumberWidth = 0;
+		if (showWeekNumbers) {
+			weekNumberWidth = head.find('th.fc-week-number').outerWidth();
+		}
+
+		colWidth = Math.floor((viewWidth - weekNumberWidth) / colCnt);
+		setOuterWidth(headCells.slice(0, -1), colWidth);
+	}
+	
+	
+	
+	/* Day clicking and binding
+	-----------------------------------------------------------*/
+	
+	
+	function dayBind(days) {
+		days.click(dayClick)
+			.mousedown(daySelectionMousedown);
+	}
+	
+	
+	function dayClick(ev) {
+		if (!opt('selectable')) { // if selectable, SelectionManager will worry about dayClick
+			var date = calendar.moment($(this).data('date'));
+			trigger('dayClick', this, date, ev);
+		}
+	}
+	
+	
+	
+	/* Semi-transparent Overlay Helpers
+	------------------------------------------------------*/
+	// TODO: should be consolidated with AgendaView's methods
+
+
+	function renderDayOverlay(overlayStart, overlayEnd, refreshCoordinateGrid) { // overlayEnd is exclusive
+
+		if (refreshCoordinateGrid) {
+			coordinateGrid.build();
+		}
+
+		var segments = rangeToSegments(overlayStart, overlayEnd);
+
+		for (var i=0; i<segments.length; i++) {
+			var segment = segments[i];
+			dayBind(
+				renderCellOverlay(
+					segment.row,
+					segment.leftCol,
+					segment.row,
+					segment.rightCol
+				)
+			);
+		}
+	}
+
+	
+	function renderCellOverlay(row0, col0, row1, col1) { // row1,col1 is inclusive
+		var rect = coordinateGrid.rect(row0, col0, row1, col1, element);
+		return renderOverlay(rect, element);
+	}
+	
+	
+	
+	/* Selection
+	-----------------------------------------------------------------------*/
+	
+	
+	function defaultSelectionEnd(start) {
+		return start.clone().stripTime().add('days', 1);
+	}
+	
+	
+	function renderSelection(start, end) { // end is exclusive
+		renderDayOverlay(start, end, true); // true = rebuild every time
+	}
+	
+	
+	function clearSelection() {
+		clearOverlays();
+	}
+	
+	
+	function reportDayClick(date, ev) {
+		var cell = dateToCell(date);
+		var _element = bodyCells[cell.row*colCnt + cell.col];
+		trigger('dayClick', _element, date, ev);
+	}
+	
+	
+	
+	/* External Dragging
+	-----------------------------------------------------------------------*/
+	
+	
+	function dragStart(_dragElement, ev, ui) {
+		hoverListener.start(function(cell) {
+			clearOverlays();
+			if (cell) {
+				var d1 = cellToDate(cell);
+				var d2 = d1.clone().add(calendar.defaultAllDayEventDuration);
+				renderDayOverlay(d1, d2);
+			}
+		}, ev);
+	}
+	
+	
+	function dragStop(_dragElement, ev, ui) {
+		var cell = hoverListener.stop();
+		clearOverlays();
+		if (cell) {
+			trigger(
+				'drop',
+				_dragElement,
+				cellToDate(cell),
+				ev,
+				ui
+			);
+		}
+	}
+	
+	
+	
+	/* Utilities
+	--------------------------------------------------------*/
+	
+	coordinateGrid = new CoordinateGrid(function() {
+		var rows, cols;
+
+		cols = headCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		rows = bodyRows.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.top, offset.top + $el.outerHeight()]];
+		}).toArray();
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	}, opt('isRTL'));
+
 	
 	hoverListener = new HoverListener(coordinateGrid);
 	
@@ -3561,6 +4113,48 @@ function AgendaWeekView(element, calendar) { // TODO: do a WeekView mixin
 
 ;;
 
+fcViews.agendaWeekJ = AgendaWeekJView;
+
+function AgendaWeekJView(element, calendar) { // TODO: do a WeekView mixin
+	var t = this;
+	
+	
+	// exports
+	t.incrementDate = incrementDate;
+	t.render = render;
+	
+	
+	// imports
+	AgendaView.call(t, element, calendar, 'agendaWeekJ');
+
+
+	function incrementDate(date, delta) {
+		return date.clone().stripTime().add('weeks', delta).startOf('week');
+	}
+
+
+	function render(date) {
+
+		t.intervalStart = date.clone().stripTime().startOf('week');
+		t.intervalEnd = t.intervalStart.clone().add('weeks', 1);
+
+		t.start = t.skipHiddenDays(t.intervalStart);
+		t.end = t.skipHiddenDays(t.intervalEnd, -1, true);
+
+		t.title = calendar.formatRange(
+			t.start,
+			t.end.clone().subtract(1), // make inclusive by subtracting 1 ms
+			t.opt('titleFormat'),
+			' \u2014 ' // emphasized dash
+		);
+
+		t.renderAgenda(t.getCellsPerWeek());
+	}
+
+
+}
+;;
+
 fcViews.agendaDay = AgendaDayView;
 
 function AgendaDayView(element, calendar) { // TODO: make a DayView mixin
@@ -3574,6 +4168,43 @@ function AgendaDayView(element, calendar) { // TODO: make a DayView mixin
 	
 	// imports
 	AgendaView.call(t, element, calendar, 'agendaDay');
+
+
+	function incrementDate(date, delta) {
+		var out = date.clone().stripTime().add('days', delta);
+		out = t.skipHiddenDays(out, delta < 0 ? -1 : 1);
+		return out;
+	}
+
+
+	function render(date) {
+
+		t.start = t.intervalStart = date.clone().stripTime();
+		t.end = t.intervalEnd = t.start.clone().add('days', 1);
+
+		t.title = calendar.formatDate(t.start, t.opt('titleFormat'));
+
+		t.renderAgenda(1);
+	}
+	
+
+}
+
+;;
+
+fcViews.agendaDayJ = AgendaDayJView;
+
+function AgendaDayJView(element, calendar) { // TODO: make a DayView mixin
+	var t = this;
+	
+	
+	// exports
+	t.incrementDate = incrementDate;
+	t.render = render;
+	
+	
+	// imports
+	AgendaView.call(t, element, calendar, 'agendaDayJ');
 
 
 	function incrementDate(date, delta) {
@@ -4259,23 +4890,27 @@ function AgendaView(element, calendar, viewName) {
 	/* Coordinate Utilities
 	-----------------------------------------------------------------------------*/
 	
-	
-	coordinateGrid = new CoordinateGrid(function(rows, cols) {
-		var e, n, p;
-		dayHeadCells.each(function(i, _e) {
-			e = $(_e);
-			n = e.offset().left;
-			if (i) {
-				p[1] = n;
-			}
-			p = [n];
-			cols[i] = p;
-		});
-		p[1] = n + e.outerWidth();
+	rtl = opt('isRTL');
+
+	coordinateGrid = new CoordinateGrid(function() {
+		var cols, rows;
+
+		cols = dayHeadCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		// if (rtl) {
+		// 	cols.reverse();
+		// }
+
+		var e, n;
+		rows = [];
 		if (opt('allDaySlot')) {
 			e = allDayRow;
 			n = e.offset().top;
-			rows[0] = [n, n+e.outerHeight()];
+			rows[0] = [n, n + e.outerHeight()];
 		}
 		var slotTableTop = slotContainer.offset().top;
 		var slotScrollerTop = slotScroller.offset().top;
@@ -4289,7 +4924,12 @@ function AgendaView(element, calendar, viewName) {
 				constrain(slotTableTop + snapHeight*(i+1))
 			]);
 		}
-	});
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	}, rtl);
 	
 	
 	hoverListener = new HoverListener(coordinateGrid);
@@ -4414,8 +5054,7 @@ function AgendaView(element, calendar, viewName) {
 			renderDayOverlay(start, end, true); // true for refreshing coordinate grid
 		}
 	}
-	
-	
+
 	function renderSlotSelection(startDate, endDate) {
 		var helperOption = opt('selectHelper');
 		coordinateGrid.build();
@@ -5075,6 +5714,7 @@ function AgendaEventRenderer() {
 		var colDelta, prevColDelta;
 		var dayDelta; // derived from colDelta
 		var snapDelta, prevSnapDelta; // the number of snaps away from the original position
+		var isRTL = opt('isRTL');
 
 		// newly computed
 		var eventStart, eventEnd;
@@ -5120,7 +5760,7 @@ function AgendaEventRenderer() {
 					isAllDay = getIsCellAllDay(cell);
 
 					// calculate column delta
-					colDelta = Math.round((ui.position.left - origPosition.left) / colWidth);
+					colDelta = (isRTL ? -1 : 1) * Math.round((ui.position.left - origPosition.left) / colWidth);
 					if (colDelta != prevColDelta) {
 						// calculate the day delta based off of the original clicked column and the column delta
 						var origDate = cellToDate(0, origCell.col);
@@ -5779,7 +6419,7 @@ function View(element, calendar, viewName) {
 	var cellsPerWeek;
 	var dayToCellMap = []; // hash from dayIndex -> cellIndex, for one week
 	var cellToDayMap = []; // hash from cellIndex -> dayIndex, for one week
-	var isRTL = opt('isRTL');
+	// var isRTL = opt('isRTL');
 
 
 	// initialize important internal variables
@@ -5862,8 +6502,8 @@ function View(element, calendar, viewName) {
 		var colCnt = t.getColCnt();
 
 		// rtl variables. wish we could pre-populate these. but where?
-		var dis = isRTL ? -1 : 1;
-		var dit = isRTL ? colCnt - 1 : 0;
+		var dis = 1; //isRTL ? -1 : 1;
+		var dit = 0; //isRTL ? colCnt - 1 : 0;
 
 		if (typeof row == 'object') {
 			col = row.col;
@@ -5876,7 +6516,7 @@ function View(element, calendar, viewName) {
 
 	// cell offset -> day offset
 	function cellOffsetToDayOffset(cellOffset) {
-		var day0 = t.start.day(); // first date's day of week
+		var day0 = t.start.weekday(); // first date's day of week
 		cellOffset += dayToCellMap[day0]; // normlize cellOffset to beginning-of-week
 		return Math.floor(cellOffset / cellsPerWeek) * 7 + // # of days from full weeks
 			cellToDayMap[ // # of days from partial last week
@@ -5924,8 +6564,8 @@ function View(element, calendar, viewName) {
 		var colCnt = t.getColCnt();
 
 		// rtl variables. wish we could pre-populate these. but where?
-		var dis = isRTL ? -1 : 1;
-		var dit = isRTL ? colCnt - 1 : 0;
+		var dis = 1; //isRTL ? -1 : 1;
+		var dit = 0; //isRTL ? colCnt - 1 : 0;
 
 		var row = Math.floor(cellOffset / colCnt);
 		var col = ((cellOffset % colCnt + colCnt) % colCnt) * dis + dit; // column, adjusted for RTL (dis & dit)
@@ -6214,8 +6854,8 @@ function DayEventRenderer() {
 			var leftFunc = (isRTL ? segment.isEnd : segment.isStart) ? colContentLeft : colLeft;
 			var rightFunc = (isRTL ? segment.isStart : segment.isEnd) ? colContentRight : colRight;
 
-			var left = leftFunc(segment.leftCol);
-			var right = rightFunc(segment.rightCol);
+			var left = leftFunc(isRTL ? segment.rightCol : segment.leftCol);
+			var right = rightFunc(isRTL ? segment.leftCol : segment.rightCol);
 			segment.left = left;
 			segment.outerWidth = right - left;
 		}
@@ -6940,7 +7580,7 @@ function OverlayManager() {
 
 ;;
 
-function CoordinateGrid(buildFunc) {
+function CoordinateGrid(buildFunc, rtl) {
 
 	var t = this;
 	var rows;
@@ -6948,40 +7588,61 @@ function CoordinateGrid(buildFunc) {
 	
 	
 	t.build = function() {
-		rows = [];
-		cols = [];
-		buildFunc(rows, cols);
+		var result = buildFunc();
+		rows = result.rows;
+		cols = result.cols;
 	};
 	
 	
 	t.cell = function(x, y) {
-		var rowCnt = rows.length;
-		var colCnt = cols.length;
-		var i, r=-1, c=-1;
-		for (i=0; i<rowCnt; i++) {
-			if (y >= rows[i][0] && y < rows[i][1]) {
-				r = i;
-				break;
-			}
+		var r=-1, c=-1, result;
+
+		function isBetween(a, s, t) {
+			return (a >= s && a < t);
 		}
-		for (i=0; i<colCnt; i++) {
-			if (x >= cols[i][0] && x < cols[i][1]) {
-				c = i;
-				break;
-			}
+		function rowCoordinateMatcher(y0) {
+			return function(row) {
+				return isBetween(y0, row[0], row[1]);
+			};
 		}
+		function colCoordinateMatcher(x0) {
+			return function(col) {
+				return isBetween(x0, col[0], col[1]);
+			};
+		}
+
+		result = rows.filter(rowCoordinateMatcher(y));
+		if (result.length > 0) {
+			r = rows.indexOf(result[0]);
+		}
+
+		result = cols.filter(colCoordinateMatcher(x));
+		if (result.length > 0) {
+			c = cols.indexOf(result[0]);
+		}
+
 		return (r>=0 && c>=0) ? { row: r, col: c } : null;
 	};
 	
 	
 	t.rect = function(row0, col0, row1, col1, originElement) { // row1,col1 is inclusive
 		var origin = originElement.offset();
-		return {
-			top: rows[row0][0] - origin.top,
-			left: cols[col0][0] - origin.left,
-			width: cols[col1][1] - cols[col0][0],
-			height: rows[row1][1] - rows[row0][0]
-		};
+		if (rtl) {
+			return {
+				top: rows[row0][0] - origin.top,
+				left: cols[col1][0] - origin.left,
+				width: cols[col0][1] - cols[col1][0],
+				height: rows[row1][1] - rows[row0][0]
+			};
+		}
+		else {
+			return {
+				top: rows[row0][0] - origin.top,
+				left: cols[col0][0] - origin.left,
+				width: cols[col1][1] - cols[col0][0],
+				height: rows[row1][1] - rows[row0][0]
+			};
+		}
 	};
 
 }
