@@ -445,40 +445,29 @@ function BasicView(element, calendar, viewName) {
 	/* Utilities
 	--------------------------------------------------------*/
 	
-	rtl = opt('isRTL');
+	coordinateGrid = new CoordinateGrid(function() {
+		var cols, rows;
+
+		cols = headCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		rows = bodyRows.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.top, offset.top + $el.outerHeight()]];
+		}).toArray();
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	});
 	
-	coordinateGrid = new CoordinateGrid(function(rows, cols) {
-		var e, n, p;
-		headCells.each(function(i, _e) {
-			e = $(_e);
-			n = e.offset().left + (rtl ? e.outerWidth() : 0);
-			if (i) {
-				p[1] = n;
-			}
-			p = [n];
-			cols[i] = p;
-		});
-		if (rtl) {
-			p[1] = e.offset().left;
-		}
-		else {
-			p[1] = n + e.outerWidth();
-		}
-		bodyRows.each(function(i, _e) {
-			if (i < rowCnt) {
-				e = $(_e);
-				n = e.offset().top;
-				if (i) {
-					p[1] = n;
-				}
-				p = [n];
-				rows[i] = p;
-			}
-		});
-		p[1] = n + e.outerHeight();
-	}, rtl);
-	
-	
+
 	hoverListener = new HoverListener(coordinateGrid);
 	
 	colPositions = new HorizontalPositionCache(function(col) {

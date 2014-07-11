@@ -660,8 +660,6 @@ function AgendaView(element, calendar, viewName) {
 	/* Coordinate Utilities
 	-----------------------------------------------------------------------------*/
 	
-	rtl = opt('isRTL');
-	
 	coordinateGrid = new CoordinateGrid(function(rows, cols) {
 		var e, n, p;
 		dayHeadCells.each(function(i, _e) {
@@ -698,7 +696,7 @@ function AgendaView(element, calendar, viewName) {
 				constrain(slotTableTop + snapHeight*(i+1))
 			]);
 		}
-	}, rtl);
+	});
 	
 	
 	hoverListener = new HoverListener(coordinateGrid);

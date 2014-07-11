@@ -1,5 +1,5 @@
 
-function CoordinateGrid(buildFunc, rtl) {
+function CoordinateGrid(buildFunc) {
 
 	var t = this;
 	var rows;
@@ -7,59 +7,51 @@ function CoordinateGrid(buildFunc, rtl) {
 	
 	
 	t.build = function() {
-		rows = [];
-		cols = [];
-		buildFunc(rows, cols);
+		var result = buildFunc();
+		rows = result.rows;
+		cols = result.cols;
 	};
 	
 	
 	t.cell = function(x, y) {
-		var rowCnt = rows.length;
-		var colCnt = cols.length;
-		var i, r=-1, c=-1;
-		for (i=0; i<rowCnt; i++) {
-			if (y >= rows[i][0] && y < rows[i][1]) {
-				r = i;
-				break;
-			}
+		var r=-1, c=-1, result;
+
+		function isBetween(a, s, t) {
+			return (a >= s && a < t);
 		}
-		for (i=0; i<colCnt; i++) {
-			if (rtl) {
-				if (x < cols[i][0] && x >= cols[i][1]) {
-					c = i;
-					break;
-				}
-			}
-			else {
-				if (x >= cols[i][0] && x < cols[i][1]) {
-					c = i;
-					break;
-				}
-			}
+		function rowCoordinateMatcher(y0) {
+			return function(row) {
+				return isBetween(y0, row[0], row[1]);
+			};
 		}
+		function colCoordinateMatcher(x0) {
+			return function(col) {
+				return isBetween(x0, col[0], col[1]);
+			};
+		}
+
+		result = rows.filter(rowCoordinateMatcher(y));
+		if (result.length > 0) {
+			r = rows.indexOf(result[0]);
+		}
+
+		result = cols.filter(colCoordinateMatcher(x));
+		if (result.length > 0) {
+			c = cols.indexOf(result[0]);
+		}
+
 		return (r>=0 && c>=0) ? { row: r, col: c } : null;
 	};
 	
 	
 	t.rect = function(row0, col0, row1, col1, originElement) { // row1,col1 is inclusive
 		var origin = originElement.offset();
-
-		if (rtl) {
-			return {
-				top: rows[row0][0] - origin.top,
-				left: cols[col0][1] - origin.left,
-				width: cols[col1][0] - cols[col0][1],
-				height: rows[row1][1] - rows[row0][0]
-			};
-		}
-		else {
-			return {
-				top: rows[row0][0] - origin.top,
-				left: cols[col0][0] - origin.left,
-				width: cols[col1][1] - cols[col0][0],
-				height: rows[row1][1] - rows[row0][0]
-			};
-		}
+		return {
+			top: rows[row0][0] - origin.top,
+			left: cols[col0][0] - origin.left,
+			width: cols[col1][1] - cols[col0][0],
+			height: rows[row1][1] - rows[row0][0]
+		};
 	};
 
 }

@@ -267,7 +267,7 @@ function JalaaliBasicView(element, calendar, viewName) {
 			"<div>";
 
 		if (showNumbers) {
-			html += "<div class='fc-day-number'>" + date.jDate() + "</div>";
+			html += "<div class='fc-day-number'>" + date.format('jD') + "</div>";
 		}
 
 		html +=
@@ -445,33 +445,28 @@ function JalaaliBasicView(element, calendar, viewName) {
 	/* Utilities
 	--------------------------------------------------------*/
 	
-	
-	coordinateGrid = new CoordinateGrid(function(rows, cols) {
-		var e, n, p;
-		headCells.each(function(i, _e) {
-			e = $(_e);
-			n = e.offset().left;
-			if (i) {
-				p[1] = n;
-			}
-			p = [n];
-			cols[i] = p;
-		});
-		p[1] = n + e.outerWidth();
-		bodyRows.each(function(i, _e) {
-			if (i < rowCnt) {
-				e = $(_e);
-				n = e.offset().top;
-				if (i) {
-					p[1] = n;
-				}
-				p = [n];
-				rows[i] = p;
-			}
-		});
-		p[1] = n + e.outerHeight();
-	}, opt('isRTL'));
-	
+	coordinateGrid = new CoordinateGrid(function() {
+		var rows, cols;
+
+		cols = headCells.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.left, offset.left + $el.outerWidth()]];
+		}).toArray();
+		rows = bodyRows.map(function(index, el) {
+			var $el = $(el),
+				offset = $el.offset();
+
+			return [[offset.top, offset.top + $el.outerHeight()]];
+		}).toArray();
+
+		return {
+			rows: rows,
+			cols: cols
+		};
+	});
+
 	
 	hoverListener = new HoverListener(coordinateGrid);
 	
